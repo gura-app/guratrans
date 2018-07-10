@@ -1,0 +1,44 @@
+#!/usr/bin/env gura
+import(wx)
+
+//-----------------------------------------------------------------------------
+// App
+//-----------------------------------------------------------------------------
+App = class(wx.App) {
+	OnInit() = {
+		frame = FrameMain('Gura Trans')
+		frame.Show()
+		true
+	}
+}
+
+//-----------------------------------------------------------------------------
+// PanelMain
+//-----------------------------------------------------------------------------
+PanelMain = class(wx.Panel) {
+	__init__(parent:wx.Window) = {|parent|
+		outerBox = wx.BoxSizer(wx.VERTICAL)
+		this.SetSizer(outerBox)
+		wx.Button(this, wx.ID_ANY, 'Push Me') {|ctrl|
+			outerBox.Add(ctrl, wx.SizerFlags().Expand())
+		}
+		wx.Button(this, wx.ID_ANY, 'Push Me') {|ctrl|
+			outerBox.Add(ctrl, wx.SizerFlags().Expand())
+		}
+	}
+}
+
+//-----------------------------------------------------------------------------
+// FrameMain
+//-----------------------------------------------------------------------------
+FrameMain = class(wx.Frame) {
+	__init__(title:string, pos:wx.Point => wx.DefaultPosition,
+			 size:wx.Size => wx.DefaultSize) = {|nil, wx.ID_ANY, title, pos, size|
+		//this.SetIcon(wx.IconFromXPMData(resource.sample_xpm))
+		menuBar = wx.MenuBar()
+		this.SetMenuBar(menuBar)
+		PanelMain(this)
+	}
+}
+
+wx.IMPLEMENT_APP(App)
