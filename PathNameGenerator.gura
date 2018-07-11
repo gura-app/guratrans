@@ -1,0 +1,57 @@
+#!/usr/bin/env gura
+//=============================================================================
+// PathNameGenerator
+//=============================================================================
+import(jpeg)
+
+PathNameGenerator = class {
+	public {
+		dirNameFormat, fileNameFormat
+	}
+	charsAtoZ = [chr(ord('A') .. ord('Z'))]
+	uniqFieldValues = cross (ch1 in charsAtoZ, ch2 in charsAtoZ):iter { ch1 + ch2 }
+	__init__(dirNameFormat:string, fileNameFormat:string) = {
+		this.dirNameFormat = dirNameFormat
+		this.fileNameFormat = fileNameFormat
+	}
+	Generate(src:stream, fileNameOrg:string, mtime:datetime, dirNameBase:string) = {
+		extName = path.extname(fileNameOrg)
+		exif = jpeg.exif(src)
+		if (exif && (m = exif.ifd0.DateTime.value.match(
+				r'(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})'))) {
+			[year, month, day, hour, min, sec] = int(m[1..6])
+		} else {
+			[year, month, day, hour, min, sec] = [
+				mtime.year, mtime.month, mtime.day, mtime.hour, mtime.min, mtime.sec
+			]
+		}
+		dirName = path.join(dirNameBase, this.ApplyFormat(this.dirNameFormat, year, month, day,
+														  hour, min, sec, dirNameBase))
+		fileName = this.ApplyFormat(this.fileNameFormat, year, month, day, hour, min, sec, dirName, extName)
+		[dirName, fileName]
+	}
+	ApplyFormat(nameFormat:string, year:number, month:number, day:number,
+				hour:number, min:number, sec:number, dirName?:string, extName:string => ''):static = {
+		if (!extName.isempty()) { extName = '.' + extName }
+		str_YYYY = format('%04d', year)
+		str_YY = format('%02d', year)
+		str_MM = format('%02d', month)
+		str_DD = format('%02d', day)
+		str_hh = format('%02d', hour)
+		str_mm = format('%02d', min)
+		str_ss = format('%02d', sec)
+		str = nameFormat.replace('[YYYY]', str_YYYY).replace('[YY]', str_YY). \
+			replace('[MM]', str_MM).replace('[DD]', str_DD). \
+			replace('[hh]', str_hh).replace('[mm]', str_mm).replace('[ss]', str_ss)
+		if (dirName) {
+			uniqFieldValues.each {|uniqFieldValue|
+				strUniq = str.replace('[AA]', uniqFieldValue) + extName
+				pathName = path.join(dirName, strUniq)
+				!path.exists(pathName) && break
+			}
+		} else {
+			strUniq = str.replace('[AA]', 'AA') + extName
+		}
+		strUniq
+	}
+}

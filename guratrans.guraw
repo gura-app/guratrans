@@ -1,12 +1,17 @@
 #!/usr/bin/env gura
+//=============================================================================
+// Gura Trans
+//=============================================================================
 import(wx)
+import(mtp)
+import(PathNameGenerator) {*}
 
 //-----------------------------------------------------------------------------
 // App
 //-----------------------------------------------------------------------------
 App = class(wx.App) {
 	OnInit() = {
-		frame = FrameMain('Gura Trans')
+		frame = FrameMain('Gura Trans', size => wx.Size(800, 600))
 		frame.Show()
 		true
 	}
@@ -18,12 +23,103 @@ App = class(wx.App) {
 PanelMain = class(wx.Panel) {
 	__init__(parent:wx.Window) = {|parent|
 		outerBox = wx.BoxSizer(wx.VERTICAL)
+		dirNameFormat = path.join('[YYYY]', '[YYYY][MM][DD] xxxx')
+		fileNameFormat = '[YYYY]_[MM][DD]_[hh][mm][ss][AA]'
 		this.SetSizer(outerBox)
-		wx.Button(this, wx.ID_ANY, 'Push Me') {|ctrl|
-			outerBox.Add(ctrl, wx.SizerFlags().Expand())
+		wx.BoxSizer(wx.VERTICAL) {|vbox|
+			outerBox.Add(vbox, wx.SizerFlags(1).Expand().Border(wx.ALL, 8))
+			wx.BoxSizer(wx.HORIZONTAL) {|hbox|
+				vbox.Add(hbox, wx.SizerFlags().Expand())
+				wx.Button(this, wx.ID_ANY, 'Push Me') {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags().Expand())
+					ctrl.Bind(wx.EVT_BUTTON) { this.ListFiles() }
+				}
+			}
+			wx.BoxSizer(wx.HORIZONTAL) {|hbox|
+				vbox.Add(hbox, wx.SizerFlags().Expand().Border(wx.TOP, 8))
+				wx.StaticText(this, wx.ID_ANY, 'Folder Name', size => wx.Size(100, -1)) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags().Align(wx.ALIGN_CENTRE_VERTICAL))
+				}
+				wx.TextCtrl(this, wx.ID_ANY, dirNameFormat) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags(1).Expand().Border(wx.LEFT, 8))
+					ctrl.SetFont(wx.Font(14, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+					this.textDirNameFormat = ctrl
+					ctrl.Bind(wx.EVT_TEXT) { this.UpdateDirNameSample() }
+				}
+				wx.StaticText(this, wx.ID_ANY, '', style => wx.ST_NO_AUTORESIZE) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags(1).Align(wx.ALIGN_CENTRE_VERTICAL).Border(wx.LEFT, 8))
+					ctrl.SetFont(wx.Font(14, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+					this.labelDirNameSample = ctrl
+				}
+			}
+			wx.BoxSizer(wx.HORIZONTAL) {|hbox|
+				vbox.Add(hbox, wx.SizerFlags().Expand().Border(wx.TOP, 8))
+				wx.StaticText(this, wx.ID_ANY, 'File Name', size => wx.Size(100, -1)) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags().Align(wx.ALIGN_CENTRE_VERTICAL))
+				}
+				wx.TextCtrl(this, wx.ID_ANY, fileNameFormat) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags(1).Expand().Border(wx.LEFT, 8))
+					ctrl.SetFont(wx.Font(14, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+					this.textFileNameFormat = ctrl
+					ctrl.Bind(wx.EVT_TEXT) { this.UpdateFileNameSample() }
+				}
+				wx.StaticText(this, wx.ID_ANY, '', style => wx.ST_NO_AUTORESIZE) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags(1).Align(wx.ALIGN_CENTRE_VERTICAL).Border(wx.LEFT, 8))
+					ctrl.SetFont(wx.Font(14, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+					this.labelFileNameSample = ctrl
+				}
+			}
+			wx.TextCtrl(this, wx.ID_ANY, '', style => wx.TE_MULTILINE) {|ctrl|
+				vbox.Add(ctrl, wx.SizerFlags(1).Expand().Border(wx.TOP, 8))
+				ctrl.SetFont(wx.Font(14, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+				this.textLog = ctrl
+			}
 		}
-		wx.Button(this, wx.ID_ANY, 'Push Me') {|ctrl|
-			outerBox.Add(ctrl, wx.SizerFlags().Expand())
+		this.UpdateDirNameSample()
+		this.UpdateFileNameSample()
+	}
+	CreateSample(fmt:string, extName:string => '') = {
+		year = 2018, month = 1, day = 23, hour = 12, min = 34, sec = 56
+		PathNameGenerator.ApplyFormat(fmt, year, month, day, hour, min, sec, nil, extName)
+	}
+	UpdateDirNameSample() = {
+		fmt = this.textDirNameFormat.GetValue()
+		this.labelDirNameSample.SetLabel(this.CreateSample(fmt))
+	}
+	UpdateFileNameSample() = {
+		fmt = this.textFileNameFormat.GetValue()
+		this.labelFileNameSample.SetLabel(this.CreateSample(fmt, 'jpg'))
+	}
+	Printf(fmt:string, values*) = {
+		this.textLog.AppendText(format(fmt, values*))
+	}
+	ListFiles() = {
+		dirNameFormat = this.textDirNameFormat.GetValue()
+		fileNameFormat = this.textFileNameFormat.GetValue()
+		devices = mtp.detect_devices()
+		if (devices.len() == 0) {
+			this.Printf('No devices detected\n')
+			return
+		}
+		device = devices[0]
+		if (device.storages.len() == 0) {
+			this.Printf('The device [%s] doesn\'t publicize any storages.\n', device.friendlyname)
+			return
+		}
+		storage = device.storages[0]
+		path.walk(storage.opendir('/DCIM'), nil, '*.jpg', '*.jpeg'):file:stat:icase {|stat|
+			fileNameOrg = path.filename(stat.pathname)
+			buff = binary()
+			storage.recvfile(stat.pathname, buff) {|sent, total|
+				//sys.stderr.printf('%s %d/%d\r', fileName, sent, total)
+			}
+			[dirName, fileName] = PathNameGenerator(dirNameFormat, fileNameFormat). \
+				Generate(buff, fileNameOrg, stat.mtime, '.')
+			!path.exists(dirName) && fs.mkdir(dirName):tree
+			pathName = path.join(dirName, fileName)
+			stream.copy(buff, pathName)
+			this.Printf('%s -> %s\n', fileNameOrg, path.join(dirName, fileName))
+			wx.App.GetInstance().Yield()
 		}
 	}
 }
