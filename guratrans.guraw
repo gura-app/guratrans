@@ -30,9 +30,20 @@ PanelMain = class(wx.Panel) {
 			outerBox.Add(vbox, wx.SizerFlags(1).Expand().Border(wx.ALL, 8))
 			wx.BoxSizer(wx.HORIZONTAL) {|hbox|
 				vbox.Add(hbox, wx.SizerFlags().Expand())
-				wx.Button(this, wx.ID_ANY, 'Push Me') {|ctrl|
+				wx.Button(this, wx.ID_ANY, 'Sources') {|ctrl|
 					hbox.Add(ctrl, wx.SizerFlags().Expand())
-					ctrl.Bind(wx.EVT_BUTTON) { this.ListFiles() }
+					ctrl.Bind(wx.EVT_BUTTON) { this.ListSources() }
+				}
+				wx.Button(this, wx.ID_ANY, 'Transfer') {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags().Expand().Border(wx.LEFT, 8))
+					ctrl.Bind(wx.EVT_BUTTON) { this.TransferFiles() }
+				}
+			}
+			wx.BoxSizer(wx.HORIZONTAL) {|hbox|
+				vbox.Add(hbox, wx.SizerFlags().Expand().Border(wx.TOP, 8))
+				wx.ListCtrl(this, wx.ID_ANY, size => wx.Size(-1, 100)) {|ctrl|
+					hbox.Add(ctrl, wx.SizerFlags(1).Expand())
+					this.listSources = ctrl
 				}
 			}
 			wx.BoxSizer(wx.HORIZONTAL) {|hbox|
@@ -90,10 +101,25 @@ PanelMain = class(wx.Panel) {
 		fmt = this.textFileNameFormat.GetValue()
 		this.labelFileNameSample.SetLabel(this.CreateSample(fmt, 'jpg'))
 	}
-	Printf(fmt:string, values*) = {
+	Printf(fmt:string, values*):map = {
 		this.textLog.AppendText(format(fmt, values*))
 	}
-	ListFiles() = {
+	ListSources() = {
+		this.listSources.DeleteAllItems()
+		devices = mtp.detect_devices()
+		i = 0
+		devices.each {|device|
+			this.listSources.InsertStringItem(i, format('MTP: %s\n', device.friendlyname))
+			i += 1
+		}
+		dirNames = path.join(path.dir('/Volumes'):list, 'DCIM')
+		dirNames = dirNames.filter(path.exists(dirNames))
+		dirNames.each {|dirName|
+			this.listSources.InsertStringItem(i, format('Folder: %s\n', dirName))
+			i += 1
+		}
+	}
+	TransferFiles() = {
 		dirNameFormat = this.textDirNameFormat.GetValue()
 		fileNameFormat = this.textFileNameFormat.GetValue()
 		devices = mtp.detect_devices()
@@ -121,6 +147,7 @@ PanelMain = class(wx.Panel) {
 			this.Printf('%s -> %s\n', fileNameOrg, path.join(dirName, fileName))
 			wx.App.GetInstance().Yield()
 		}
+		this.Printf('done\n')
 	}
 }
 
