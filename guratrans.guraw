@@ -4,6 +4,7 @@
 //=============================================================================
 import(wx)
 import(mtp)
+(sys.platform == `mswin) && import(mswin)
 import(PathNameGenerator) {*}
 
 //-----------------------------------------------------------------------------
@@ -112,7 +113,16 @@ PanelMain = class(wx.Panel) {
 			this.listSources.InsertStringItem(i, format('MTP: %s\n', device.friendlyname))
 			i += 1
 		}
-		dirNames = path.join(path.dir('/Volumes'):list, 'DCIM')
+		if (sys.platform == `mswin) {
+			fso = mswin.ole('Scripting.FileSystemObject')
+			dirNames = for (drive in fso.Drives):xlist {
+				if (drive.IsReady) {
+					path.join(drive.DriveLetter + ':', 'DCIM')
+				}
+			}
+		} elsif (sys.platform == `darwin) {
+			dirNames = path.join(path.dir('/Volumes'):list, 'DCIM')
+		}
 		dirNames = dirNames.filter(path.exists(dirNames))
 		dirNames.each {|dirName|
 			this.listSources.InsertStringItem(i, format('Folder: %s\n', dirName))
